@@ -1,0 +1,23 @@
+{
+  "pluginAlias": "JvcDlaAccessory",
+  "pluginType": "accessory",
+  "singular": false,
+  "schema": {
+    "type": "object",
+    "required": [
+      "name",
+      "host"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the accessory instance."
+      },
+      "host": {
+        "type": "string",
+        "description": "Projector host name or IP address."
+      }
+    }
+  }
+}
