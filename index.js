@@ -98,10 +98,9 @@ class LensPosition {
     this.log = accessory.log;
     this.service = new hap.Service.WindowCovering(`${this.name} Lens`);
 
-    this._state = hap.Characteristic.PositionState.STOPPED;
     this.service
       .getCharacteristic(hap.Characteristic.PositionState)
-      .onGet(async () => this._state);
+      .onGet(async () => this.state);
 
     this._current = 10;
     this.service
@@ -121,17 +120,17 @@ class LensPosition {
   }
 
   get isStopped() {
-    return this._state === hap.Characteristic.PositionState.STOPPED;
+    return this.state === hap.Characteristic.PositionState.STOPPED;
   }
 
-  set state(state) {
-    if (state !== this._state) {
-      this.log.info(`Lens state: ${state}`);
-      this._state = state;
-      this.service
-        .getCharacteristic(hap.Characteristic.PositionState)
-        .updateValue(this._state);
+  get state() {
+    if (this._target > this._current) {
+      return hap.Characteristic.PositionState.INCREASING;
     }
+    if (this._target < this._current) {
+      return hap.Characteristic.PositionState.DECREASING;
+    }
+    return hap.Characteristic.PositionState.STOPPED;
   }
 
   set current(current) {
@@ -141,9 +140,9 @@ class LensPosition {
       this.service
         .getCharacteristic(hap.Characteristic.CurrentPosition)
         .updateValue(this._current);
-    }
-    if (this._current === this._target) {
-      this.state = hap.Characteristic.PositionState.STOPPED;
+      this.service
+        .getCharacteristic(hap.Characteristic.PositionState)
+        .updateValue(this.state);
     }
   }
 
@@ -161,13 +160,9 @@ class LensPosition {
       this.service
         .getCharacteristic(hap.Characteristic.TargetPosition)
         .updateValue(this._target);
-    }
-    if (target > this._current) {
-      this.state = hap.Characteristic.PositionState.INCREASING;
-    } else if (target < this._current) {
-      this.state = hap.Characteristic.PositionState.DECREASING;
-    } else {
-      this.state = hap.Characteristic.PositionState.STOPPED;
+      this.service
+        .getCharacteristic(hap.Characteristic.PositionState)
+        .updateValue(this.state);
     }
   }
 }
