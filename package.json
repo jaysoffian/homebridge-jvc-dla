@@ -1,21 +1,34 @@
 {
-  "dependencies": {
-    "async-mutex": "^0.2.6",
-    "promise-socket": "^7.0.0"
-  },
-  "description": "A Homebridge plugin to control JVC DLA projectors",
   "displayName": "Homebridge JVC DLA Projector",
+  "name": "homebridge-jvc-dla",
+  "version": "1.0.1",
+  "description": "A Homebridge plugin to control JVC DLA projectors",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jaysoffian/homebridge-jvc-dla.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jaysoffian/homebridge-jvc-dla/issues"
+  },
+  "scripts": {
+      "lint": "prettier -w *.js && eslint --fix *.js"
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "jvc",
+    "dla"
+  ],
+  "author": "jaysoffian",
+  "license": "MIT",
   "engines": {
     "homebridge": ">=1.6.0",
     "node": ">=16.10.0"
   },
-  "keywords": [
-    "homebridge-plugin"
-  ],
-  "license": "MIT",
-  "main": "index.js",
-  "name": "homebridge-jvc-dla",
-  "version": "1.0.0",
+  "dependencies": {
+    "async-mutex": "^0.2.6",
+    "promise-socket": "^7.0.0"
+  },
   "devDependencies": {
     "eslint": "^8.23.0",
     "eslint-config-airbnb-base": "^15.0.0",
