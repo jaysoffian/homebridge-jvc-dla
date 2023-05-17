@@ -3,8 +3,19 @@ const { PromiseSocket, TimeoutError } = require("promise-socket");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const bytes = (s) => Buffer.from(s, "latin1");
-const latin1 = (buf) => buf.toString("latin1");
-const hex = (buf) => buf.toString("hex");
+const latin1 = (buf, ...args) => buf.slice(...args).toString("latin1");
+const hex = (buf, ...args) =>
+  buf
+    .slice(...args)
+    .toString("hex")
+    .split(/(..)/)
+    .filter((x) => !!x)
+    .join(" ");
+
+const [PJ_OK, PJREQ, PJACK] = ["PJ_OK", "PJREQ", "PJACK"].map(bytes);
+const UNIT_ID = "\x89\x01";
+const [OPERATION, REFERENCE] = ["!", "?"];
+const [ACK, RESPONSE, END] = ["\x06", "@", "\n"];
 
 class Power {
   static Off = new Power("Off");
@@ -18,18 +29,27 @@ class Power {
   toString() {
     return this.name;
   }
-  get isOn() {
-    return this === Power.On;
-  }
   get isOff() {
     return this === Power.Off;
   }
+  get isOn() {
+    return this === Power.On;
+  }
+  get isCooling() {
+    return this === Power.Cooling;
+  }
+  get isWarming() {
+    return this === Power.Warming;
+  }
+  get isEmergency() {
+    return this === Power.Emergency;
+  }
 }
 
-class JvcError extends Error {
+class CommandError extends Error {
   constructor(error) {
     super(error);
-    this.name = "JvcError";
+    this.name = "CommandError";
   }
 }
 
@@ -42,10 +62,26 @@ class Command {
   }
 
   toString() {
-    return `${this.type}${hex(bytes(this.code))}`;
+    return JSON.stringify(latin1(bytes(this.code)));
   }
 
-  static #Operation = (...args) => new Command("!", ...args);
+  get request() {
+    return bytes(`${this.type}${UNIT_ID}${this.code}\n`);
+  }
+
+  get ack() {
+    return bytes(`${ACK}${UNIT_ID}${this.code.substr(0, 2)}\n`);
+  }
+
+  get response_prefix() {
+    return bytes(`${RESPONSE}${UNIT_ID}${this.code.substr(0, 2)}`);
+  }
+
+  get response_length() {
+    return 5 /* response_prefix */ + this.length + 1 /* \n */;
+  }
+
+  static #Operation = (...args) => new Command(OPERATION, ...args);
   static Operation = {
     Null: Command.#Operation("\x00\x00"),
     Power: {
@@ -66,7 +102,7 @@ class Command {
     },
   };
 
-  static #Reference = (...args) => new Command("?", ...args);
+  static #Reference = (...args) => new Command(REFERENCE, ...args);
   static Reference = {
     Power: Command.#Reference("PW", 1, (c) => {
       return {
@@ -85,9 +121,9 @@ class Command {
 }
 
 class Jvc {
-  static Reference = Command.Reference;
   static Operation = Command.Operation;
-  static Error = JvcError;
+  static Reference = Command.Reference;
+  static CommandError = CommandError;
   static TimeoutError = TimeoutError;
   static Power = Power;
 
@@ -100,7 +136,6 @@ class Jvc {
   async _connect() {
     this.disconnect();
 
-    const [PJ_OK, PJREQ, PJACK] = ["PJ_OK", "PJREQ", "PJACK"].map(bytes);
     const sock = (this.sock = new PromiseSocket());
 
     sock.setTimeout(2 * 1000);
@@ -113,17 +148,20 @@ class Jvc {
     // Check for PJ_OK
     let resp = await sock.read(PJ_OK.length);
     if (!PJ_OK.equals(resp)) {
-      throw new JvcError("Did not receive PJ_OK");
+      throw new CommandError("Did not receive PJ_OK");
     }
+    this.debug("<<< PJ_OK");
 
     // Send PJREQ
+    this.debug(">>> PJREQ");
     await sock.write(PJREQ);
 
     // Check for PJACK
     resp = await sock.read(PJACK.length);
     if (!PJACK.equals(resp)) {
-      throw new JvcError("Did not receive PJACK");
+      throw new CommandError("Did not receive PJACK");
     }
+    this.debug("<<< PJACK");
 
     // Issue null command to ensure we're connected
     await this._send(Jvc.Operation.Null);
@@ -141,7 +179,7 @@ class Jvc {
         await sleep(attempt * 1100);
       }
     }
-    throw new JvcError("Did not connect");
+    throw new CommandError("Did not connect");
   }
 
   disconnect() {
@@ -158,41 +196,38 @@ class Jvc {
   }
 
   async _send(command) {
-    this.debug(command);
+    this.debug(`CMD ${command}`);
 
-    const { type, code } = command;
-    const unit_id = "\x89\x01";
-    const request = bytes(`${type}${unit_id}${code}\n`);
-    const ack = bytes(`\x06${unit_id}${code.substr(0, 2)}\n`);
+    const { type, request, ack } = command;
 
-    this.debug(command.type + " " + hex(request));
+    this.debug(`>>> ${hex(request)}`);
     await this.sock.write(request);
 
     let resp = await this.sock.read(ack.length);
-    this.debug("A " + hex(resp));
+    this.debug(`ACK ${hex(resp)}`);
 
     if (!ack.equals(resp)) {
-      throw new JvcError("Did not receive ACK");
+      throw new CommandError("Did not receive ACK");
     }
 
-    if (command.type !== "?") {
+    if (type === OPERATION) {
       return;
     }
 
-    const prefix = bytes(`@${unit_id}${code.substr(0, 2)}`);
+    const { response_length, response_prefix } = command;
 
-    resp = await this.sock.read(prefix.length + command.length + 1);
-    this.debug("@ " + hex(resp));
+    resp = await this.sock.read(response_length);
+    this.debug(`<<< ${hex(resp)}`);
 
-    if (!prefix.equals(resp.slice(0, prefix.length))) {
-      throw new JvcError("Did not receive response prefix");
+    if (!response_prefix.equals(resp.slice(0, response_prefix.length))) {
+      throw new CommandError("Did not receive response prefix");
     }
 
-    if (resp.readUInt8(resp.length - 1) !== 0x0a) {
-      throw new JvcError("Did not receive response end");
+    if (latin1(resp, -1) !== END) {
+      throw new CommandError("Did not receive response end");
     }
 
-    return command.decode(latin1(resp.slice(prefix.length, -1)));
+    return command.decode(latin1(resp, response_prefix.length, -1));
   }
 
   async send(command) {
@@ -212,6 +247,10 @@ class Jvc {
     return await this.send(Jvc.Reference.Power);
   }
 
+  async setPower(on) {
+    await this.send(on ? Jvc.Operation.Power.On : Jvc.Operation.Power.Off);
+  }
+
   async getModel() {
     const value = await this.send(Jvc.Reference.Model);
     return /^ILAFPJ -- (.*)$/.exec(value)[1];
@@ -222,11 +261,21 @@ class Jvc {
   }
 
   async getSoftwareVersion() {
-    return await this.send(Jvc.Reference.SoftwareVersion);
+    const value = await this.send(Jvc.Reference.SoftwareVersion);
+    const match = /^(\d{2})(\d{2})PJ/.exec(value); // e.g. "0352PJ"
+    return match ? `${match[1]}.${match[2]}` : value;
   }
 
   async getLensMemory() {
     return await this.send(Jvc.Reference.LensMemory);
+  }
+
+  async setLensMemory(memory) {
+    const command = Jvc.Operation.LensMemory[memory];
+    if (command === undefined) {
+      throw new CommandError(`Invalid memory: ${memory}`);
+    }
+    await this.send(command);
   }
 }
 
