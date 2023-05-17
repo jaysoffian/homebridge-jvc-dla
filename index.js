@@ -239,7 +239,14 @@ class JvcDlaAccessory {
     await this.mutex.acquire();
     try {
       this.log.debug(`Sending command ${command}`);
+      await this.jvc.connect();
+      // Use a longer timeout when sending operations since the projector doesn't
+      // return a response till the operation is completed. Moving the lens position
+      // can take a while to complete.
+      this.jvc.setTimeout(60 * 1000);
       await this.jvc.send(command);
+    } catch (e) {
+      this.log.info(`[ERROR] ${e}`);
     } finally {
       this.jvc.disconnect();
       await this.mutex.release();
@@ -252,6 +259,7 @@ class JvcDlaAccessory {
       await this.mutex.acquire();
       try {
         this.log.debug("Polling projector status");
+        await this.jvc.connect();
         this.powerSwitch.state = await jvc.getPower();
         this.information.model = await jvc.getModel();
         this.information.serialNumber = await jvc.getMacAddress();
@@ -259,6 +267,8 @@ class JvcDlaAccessory {
           this.information.firmwareRevision = await jvc.getSoftwareVersion();
           this.lensPosition.current = (await jvc.getLensMemory()) * 10;
         }
+      } catch (e) {
+        this.log.info(`[ERROR] ${e}`);
       } finally {
         jvc.disconnect();
         await this.mutex.release();
