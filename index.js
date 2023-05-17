@@ -70,16 +70,12 @@ class PowerSwitch {
     this.service = new hap.Service.Switch(`${accessory.name} Power`);
     this.service
       .getCharacteristic(hap.Characteristic.On)
-      .onGet(async () => this.isOn)
+      .onGet(async () => this.isWarmingOrOn)
       .onSet(accessory.setPower.bind(accessory));
   }
 
-  get isOn() {
-    return this._state === Jvc.Power.On;
-  }
-
-  get isOff() {
-    return this._state === Jvc.Power.Off;
+  get isWarmingOrOn() {
+    return [Jvc.Power.Warming, Jvc.Power.On].includes(this._state);
   }
 
   get state() {
@@ -92,7 +88,7 @@ class PowerSwitch {
       this._state = state;
       this.service
         .getCharacteristic(hap.Characteristic.On)
-        .updateValue(this.isOn);
+        .updateValue(this.isWarmingOrOn);
     }
   }
 }
@@ -199,13 +195,13 @@ class JvcDlaAccessory {
     this.log.info(`Set power: ${turnOn ? "on" : "off"}`);
 
     if (turnOn) {
-      if (!this.powerSwitch.isOff) {
+      if (this.powerSwitch.state !== Jvc.Power.Off) {
         this.log.info("Can't power-on (projector not off)");
         return;
       }
       await this.command(Jvc.Operation.Power.On);
     } else {
-      if (!this.powerSwitch.isOn) {
+      if (this.powerSwitch.state !== Jvc.Power.On) {
         this.log.info("Can't power-off (projector not on)");
         return;
       }
@@ -216,7 +212,7 @@ class JvcDlaAccessory {
   async setLensPosition(position) {
     this.log.info(`Set lens position: ${position}`);
 
-    if (!this.powerSwitch.isOn) {
+    if (this.powerSwitch.state !== Jvc.Power.On) {
       this.log.info("Can't set lens (projector not on)");
       return;
     }
@@ -263,7 +259,7 @@ class JvcDlaAccessory {
         this.powerSwitch.state = await jvc.getPower();
         this.information.model = await jvc.getModel();
         this.information.serialNumber = await jvc.getMacAddress();
-        if (this.powerSwitch.isOn) {
+        if (this.powerSwitch.state === Jvc.Power.On) {
           this.information.firmwareRevision = await jvc.getSoftwareVersion();
           this.lensPosition.current = (await jvc.getLensMemory()) * 10;
         }
