@@ -25,6 +25,7 @@
 //
 
 "use strict";
+const assert = require("node:assert");
 const { PromiseSocket, TimeoutError } = require("promise-socket");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -81,6 +82,10 @@ class CommandError extends Error {
 
 class Command {
   constructor(type, code, length, decode) {
+    assert(
+      (type === REFERENCE && length > 0 && typeof decode === "function") ||
+        (type == OPERATION && length === undefined && decode == undefined)
+    );
     this.type = type;
     this.code = code;
     this.length = length;
@@ -154,6 +159,7 @@ class Jvc {
   static Power = Power;
 
   constructor(host, debug) {
+    assert(debug === undefined || typeof debug === "function");
     this.host = host;
     this.sock = null;
     this.debug = debug || (() => undefined);
