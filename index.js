@@ -25,23 +25,20 @@ class Information {
     this.service = new Service.AccessoryInformation(accessory.name);
     this.service.setCharacteristic(Manufacturer, "JVC");
 
-    this.service.setCharacteristic(Model, "DLA");
     this.service.getCharacteristic(Model).onGet(async () => {
       const rv = this.#model ?? "DLA";
       this.log.info(`Get Information.Model: ${rv}`);
       return rv;
     });
 
-    this.service.setCharacteristic(SerialNumber, "0");
     this.service.getCharacteristic(SerialNumber).onGet(async () => {
-      const rv = this.#serialNumber ?? "0";
+      const rv = this.#serialNumber ?? "".padStart(12, "0");
       this.log.info(`Get Information.SerialNumber: ${rv}`);
       return rv;
     });
 
-    this.service.setCharacteristic(FirmwareRevision, "0");
     this.service.getCharacteristic(FirmwareRevision).onGet(async () => {
-      const rv = this.#firmwareRevision ?? "0";
+      const rv = this.#firmwareRevision ?? "0.0";
       this.log.info(`Get Information.FirmwareRevision: ${rv}`);
       return rv;
     });
