@@ -1,3 +1,29 @@
+// jvc.js
+// ~~~~~~
+// JVC D-ILA Projector LAN Remote Control Protocol Client.
+//
+// References:
+//
+// JVC D-ILA Projector RS-232C, LAN and Infrared Remote Control Guide (2011)
+// - XH4: DLA-HD350
+// - XH7: DLA-RS10
+// - XH5: DLA-HD750, DLA-RS20
+// - XH8: DLA-HD550
+// - XHA: DLA-RS15
+// - XH9: DLA-HD950, DLA-HD990, DLA-RS25, DLA-RS35
+// - XHB: DLA-X3, DLA-RS40
+// - XHC: DLA-X7, DLA-X9, DLA-RS50, DLA-RS60
+// - XHE: DLA-X30, DLA-RS45
+// - XHF: DLA-X70R, DLA-X90R, DLA-RS55, DLA-RS65
+// https://support.jvc.com/consumer/support/documents/DILAremoteControlGuide.pdf
+//
+// D-ILA Projector External Command Communication Specification (2018)
+// - B2A1: DLA-RS3000, NX9, NX11, V9R Series
+// - B2A2: DLA-RS2000, NX7, N8, V7 Series
+// - B2A3: DLA-RS1000, NX5, N5, N6, V5 Series
+// https://www.us.jvc.com/projectors/pdf/2018_ILA-FPJ_Ext_Command_List_v1.2.pdf
+//
+
 "use strict";
 const { PromiseSocket, TimeoutError } = require("promise-socket");
 
@@ -13,9 +39,9 @@ const hex = (buf, ...args) =>
     .join(" ");
 
 const [PJ_OK, PJREQ, PJACK] = ["PJ_OK", "PJREQ", "PJACK"].map(bytes);
+const [OPERATION, REFERENCE, RESPONSE, ACK] = ["!", "?", "@", "\x06"];
 const UNIT_ID = "\x89\x01";
-const [OPERATION, REFERENCE] = ["!", "?"];
-const [ACK, RESPONSE, END] = ["\x06", "@", "\n"];
+const END = "\n";
 
 class Power {
   static Off = new Power("Off");
