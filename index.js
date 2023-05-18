@@ -256,27 +256,26 @@ class JvcDlaAccessory {
   }
 
   async setPower(on) {
-    await this.#command(on ? Jvc.Operation.Power.On : Jvc.Operation.Power.Off);
+    await this.#send(on ? Jvc.Operation.Power.On : Jvc.Operation.Power.Off);
   }
 
   async setLensPosition(position) {
-    return await this.#command(Jvc.Operation.LensMemory[position / 10]);
+    return await this.#send(Jvc.Operation.LensMemory[position / 10]);
   }
 
-  async #command(command) {
+  async #send(command) {
     const jvc = this.#jvc;
     await this.#mutex.acquire();
     try {
-      this.log.info(`Sending command ${command}`);
+      this.log.info(`>>> ${command}`);
       await jvc.connect();
-      // Prevent TimeoutError when performing operations since moving the lens
-      // takes a while to complete.
+      // Lens operations take a while to ack so use a longer timeout
       jvc.setTimeout(60 * 1000);
       await jvc.send(command);
-      this.log.info(`Command ${command} complete`);
+      this.log.info(`ACK ${command}`);
       return true;
     } catch (e) {
-      this.log.info(`[ERROR] Command ${command}: ${e}`);
+      this.log.info(`ERR ${command} ${e}`);
       return false;
     } finally {
       jvc.disconnect();
