@@ -85,17 +85,17 @@ class PowerSwitch {
     this.service
       .getCharacteristic(Characteristic.On)
       .onGet(async () => {
-        const on = this.isWarmingOrOn;
-        this.log.info(`Get Power.On: ${on}`);
-        return on;
+        const value = this.#power.isWarming || this.#power.isOn;
+        this.log.info(`Get Power.On: ${value}`);
+        return value;
       })
       .onSet(async (on) => {
         const logMessage = `Set Power.On to: ${on}`;
-        if (on && !this.isOff) {
+        if (on && !this.#power.isOff) {
           this.log.info(`${logMessage}, projector not off`);
           return;
         }
-        if (!on && !this.isOn) {
+        if (!on && !this.#power.isOn) {
           this.log.info(`${logMessage}, projector not on`);
           return;
         }
@@ -104,29 +104,16 @@ class PowerSwitch {
       });
   }
 
-  get isWarming() {
-    return this.#power.isWarming;
-  }
-
-  get isOff() {
-    return this.#power.isOff;
-  }
-
-  get isOn() {
-    return this.#power.isOn;
-  }
-
-  get isWarmingOrOn() {
-    return this.isWarming || this.isOn;
+  get power() {
+    return this.#power;
   }
 
   updatePower(power) {
     if (power && power !== this.#power) {
       this.#power = power;
-      this.log.info(`Update PowerSwitch.On to: ${this.isWarmingOrOn}`);
-      this.service
-        .getCharacteristic(Characteristic.On)
-        .updateValue(this.isWarmingOrOn);
+      const value = this.#power.isWarming || this.#power.isOn;
+      this.log.info(`Update PowerSwitch.On to: ${value}`);
+      this.service.getCharacteristic(Characteristic.On).updateValue(value);
     }
   }
 }
@@ -182,7 +169,7 @@ class LensPosition {
       .onSet(async (position) => {
         position = Math.max(Math.floor(position / 10), 1) * 10;
         const logMessage = `Set Lens.TargetPosition to: ${position}`;
-        if (!accessory.isOn) {
+        if (!accessory.power.isOn) {
           this.log.info(`${logMessage}, projector not on`);
           this.service
             .getCharacteristic(Characteristic.TargetPosition)
@@ -264,8 +251,8 @@ class JvcDlaAccessory {
     );
   }
 
-  get isOn() {
-    return this.#powerSwitch.isOn;
+  get power() {
+    return this.#powerSwitch.power;
   }
 
   async setPower(on) {
@@ -312,7 +299,7 @@ class JvcDlaAccessory {
         this.#information.updateModel(await jvc.getModel());
         this.#information.updateSerialNumber(await jvc.getMacAddress());
 
-        if (this.#powerSwitch.isOn) {
+        if (this.power.isOn) {
           this.#lensPosition.updatePosition((await jvc.getLensMemory()) * 10);
           this.#information.updateFirmwareRevision(
             await jvc.getSoftwareVersion()
@@ -325,7 +312,7 @@ class JvcDlaAccessory {
         await this.#mutex.release();
       }
       this.#poll(
-        this.#powerSwitch.isOff
+        this.power.isOff
           ? JvcDlaAccessory.#POLL_DELAY_OFF
           : JvcDlaAccessory.#POLL_DELAY_NOT_OFF
       );
