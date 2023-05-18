@@ -227,6 +227,9 @@ class LensPosition {
 }
 
 class JvcDlaAccessory {
+  static #POLL_DELAY_OFF = 60 * 1000;
+  static #POLL_DELAY_NOT_OFF = 5 * 1000;
+
   #jvc;
   #mutex;
   #information;
@@ -242,7 +245,7 @@ class JvcDlaAccessory {
     this.#information = new Information(this);
     this.#powerSwitch = new PowerSwitch(this);
     this.#lensPosition = new LensPosition(this);
-    this.#poll(1);
+    this.#poll(JvcDlaAccessory.#POLL_DELAY_NOT_OFF);
   }
 
   getServices() {
@@ -284,15 +287,11 @@ class JvcDlaAccessory {
     }
   }
 
-  static #POLL_DELAY_OFF = 60 * 1000;
-  static #POLL_DELAY_NOT_OFF = 5 * 1000;
-
   #poll(delay) {
     const poll = async () => {
       const jvc = this.#jvc;
       await this.#mutex.acquire();
       try {
-        this.log.info("Poll projector");
         await jvc.connect();
 
         this.#powerSwitch.updatePower(await jvc.getPower());
@@ -311,11 +310,13 @@ class JvcDlaAccessory {
         jvc.disconnect();
         await this.#mutex.release();
       }
-      this.#poll(
-        this.power.isOff
-          ? JvcDlaAccessory.#POLL_DELAY_OFF
-          : JvcDlaAccessory.#POLL_DELAY_NOT_OFF
-      );
+      const nextPollDelay = this.power.isOff
+        ? JvcDlaAccessory.#POLL_DELAY_OFF
+        : JvcDlaAccessory.#POLL_DELAY_NOT_OFF;
+      if (nextPollDelay !== delay) {
+        this.log.info(`Update #poll delay to: ${nextPollDelay / 1000}s`);
+      }
+      this.#poll(nextPollDelay);
     };
     const timeoutObj = setTimeout(poll, delay);
     timeoutObj.unref();
