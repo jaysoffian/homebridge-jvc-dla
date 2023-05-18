@@ -134,7 +134,7 @@ class PositionState {
 }
 
 class LensPosition {
-  #position = 10;
+  #position = 10; // 10 - 100 in steps of 10
   #state = PositionState.STOPPED;
 
   constructor(accessory) {
@@ -167,7 +167,7 @@ class LensPosition {
         return this.#position;
       })
       .onSet(async (position) => {
-        position = Math.max(Math.floor(position / 10), 1) * 10;
+        position = 10 * Math.min(Math.max(Math.floor(position / 10), 1), 10);
         const logMessage = `Set Lens.TargetPosition to: ${position}`;
         if (!accessory.power.isOn) {
           this.log.info(`${logMessage}, projector not on`);
