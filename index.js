@@ -12,63 +12,33 @@ module.exports = (api) => {
 };
 
 class Information {
-  #model;
-  #serialNumber;
-  #firmwareRevision;
-
+  #values = {
+    Model: "DLA",
+    SerialNumber: "".padStart(12, "0"),
+    FirmwareRevision: "0.0",
+  };
   constructor(accessory) {
     this.log = accessory.log;
 
-    const { Manufacturer, Model, SerialNumber, FirmwareRevision } =
-      Characteristic;
-
     this.service = new Service.AccessoryInformation(accessory.name);
-    this.service.setCharacteristic(Manufacturer, "JVC");
+    this.service.setCharacteristic(Characteristic.Manufacturer, "JVC");
 
-    this.service.getCharacteristic(Model).onGet(async () => {
-      const rv = this.#model ?? "DLA";
-      this.log.info(`Get Information.Model: ${rv}`);
-      return rv;
-    });
+    Object.keys(this.#values).forEach((key) => {
+      this.service.getCharacteristic(Characteristic[key]).onGet(async () => {
+        const value = this.#values[key];
+        this.log.info(`Get Information.${key}: ${value}`);
+        return value;
+      });
 
-    this.service.getCharacteristic(SerialNumber).onGet(async () => {
-      const rv = this.#serialNumber ?? "".padStart(12, "0");
-      this.log.info(`Get Information.SerialNumber: ${rv}`);
-      return rv;
-    });
-
-    this.service.getCharacteristic(FirmwareRevision).onGet(async () => {
-      const rv = this.#firmwareRevision ?? "0.0";
-      this.log.info(`Get Information.FirmwareRevision: ${rv}`);
-      return rv;
+      this[`update${key}`] = (value) => this.#update(key, value);
     });
   }
 
-  updateModel(value) {
-    if (value && value !== this.#model) {
-      this.log.info(`Update Information.Model to: ${value}`);
-      this.#model = value;
-      this.service.getCharacteristic(Characteristic.Model).updateValue(value);
-    }
-  }
-
-  updateSerialNumber(value) {
-    if (value && value !== this.#serialNumber) {
-      this.log.info(`Update Information.SerialNumber to: ${value}`);
-      this.#serialNumber = value;
-      this.service
-        .getCharacteristic(Characteristic.SerialNumber)
-        .updateValue(value);
-    }
-  }
-
-  updateFirmwareRevision(value) {
-    if (value && value !== this.#firmwareRevision) {
-      this.log.info(`Update Information.FirmwareRevision to: ${value}`);
-      this.#firmwareRevision = value;
-      this.service
-        .getCharacteristic(Characteristic.FirmwareRevision)
-        .updateValue(value);
+  #update(key, value) {
+    if (value && value !== this.#values[key]) {
+      this.log.info(`Update Information.${key} to: ${value}`);
+      this.#values[key] = value;
+      this.service.getCharacteristic(Characteristic[key]).updateValue(value);
     }
   }
 }
