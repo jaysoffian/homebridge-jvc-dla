@@ -2,271 +2,335 @@
 const Jvc = require("./jvc");
 const { Mutex } = require("async-mutex");
 
-let hap;
+let hap, Characteristic, Service;
 
 module.exports = (api) => {
   hap = api.hap;
+  Characteristic = hap.Characteristic;
+  Service = hap.Service;
   api.registerAccessory("JvcDlaAccessory", JvcDlaAccessory);
 };
 
 class Information {
+  #model;
+  #serialNumber;
+  #firmwareRevision;
+
   constructor(accessory) {
     this.log = accessory.log;
 
-    this.service = new hap.Service.AccessoryInformation();
-    this.service.setCharacteristic(hap.Characteristic.Manufacturer, "JVC");
+    const { Manufacturer, Model, SerialNumber, FirmwareRevision } =
+      Characteristic;
 
-    this._firmwareRevision = undefined;
-    this.service
-      .getCharacteristic(hap.Characteristic.FirmwareRevision)
-      .onGet(async () => this._firmwareRevision ?? "???");
+    this.service = new Service.AccessoryInformation(accessory.name);
+    this.service.setCharacteristic(Manufacturer, "JVC");
 
-    this._model = undefined;
-    this.service
-      .getCharacteristic(hap.Characteristic.Model)
-      .onGet(async () => this._model ?? "???");
+    this.service.setCharacteristic(Model, "DLA");
+    this.service.getCharacteristic(Model).onGet(async () => {
+      const rv = this.#model ?? "DLA";
+      this.log.info(`Get Information.Model: ${rv}`);
+      return rv;
+    });
 
-    this._serialNumber = undefined;
-    this.service
-      .getCharacteristic(hap.Characteristic.SerialNumber)
-      .onGet(async () => this._serialNumber ?? "???");
+    this.service.setCharacteristic(SerialNumber, "0");
+    this.service.getCharacteristic(SerialNumber).onGet(async () => {
+      const rv = this.#serialNumber ?? "0";
+      this.log.info(`Get Information.SerialNumber: ${rv}`);
+      return rv;
+    });
+
+    this.service.setCharacteristic(FirmwareRevision, "0");
+    this.service.getCharacteristic(FirmwareRevision).onGet(async () => {
+      const rv = this.#firmwareRevision ?? "0";
+      this.log.info(`Get Information.FirmwareRevision: ${rv}`);
+      return rv;
+    });
   }
 
-  set model(model) {
-    if (model && model !== this._model) {
-      this.log.info(`Model: ${model}`);
-      this._model = model;
-      this.service
-        .getCharacteristic(hap.Characteristic.Model)
-        .updateValue(this._model);
+  updateModel(value) {
+    if (value && value !== this.#model) {
+      this.log.info(`Update Information.Model to: ${value}`);
+      this.#model = value;
+      this.service.getCharacteristic(Characteristic.Model).updateValue(value);
     }
   }
 
-  set serialNumber(serialNumber) {
-    if (serialNumber && serialNumber !== this._serialNumber) {
-      this.log.info(`SerialNumber: ${serialNumber}`);
-      this._serialNumber = serialNumber;
+  updateSerialNumber(value) {
+    if (value && value !== this.#serialNumber) {
+      this.log.info(`Update Information.SerialNumber to: ${value}`);
+      this.#serialNumber = value;
       this.service
-        .getCharacteristic(hap.Characteristic.SerialNumber)
-        .updateValue(this._serialNumber);
+        .getCharacteristic(Characteristic.SerialNumber)
+        .updateValue(value);
     }
   }
 
-  set firmwareRevision(firmwareRevision) {
-    if (firmwareRevision && firmwareRevision !== this._firmwareRevision) {
-      this.log.info(`FirmwareRevision: ${firmwareRevision}`);
-      this._firmwareRevision = firmwareRevision;
+  updateFirmwareRevision(value) {
+    if (value && value !== this.#firmwareRevision) {
+      this.log.info(`Update Information.FirmwareRevision to: ${value}`);
+      this.#firmwareRevision = value;
       this.service
-        .getCharacteristic(hap.Characteristic.FirmwareRevision)
-        .updateValue(this._firmwareRevision);
+        .getCharacteristic(Characteristic.FirmwareRevision)
+        .updateValue(value);
     }
   }
 }
 
 class PowerSwitch {
+  #power = Jvc.Power.Off;
+
   constructor(accessory) {
     this.log = accessory.log;
-    this._state = undefined;
-    this.service = new hap.Service.Switch(`${accessory.name} Power`);
+    this.service = new Service.Switch(`${accessory.name} PowerSwitch`);
     this.service
-      .getCharacteristic(hap.Characteristic.On)
-      .onGet(async () => this.isWarmingOrOn)
-      .onSet(accessory.setPower.bind(accessory));
+      .getCharacteristic(Characteristic.On)
+      .onGet(async () => {
+        const on = this.isWarmingOrOn;
+        this.log.info(`Get Power.On: ${on}`);
+        return on;
+      })
+      .onSet(async (on) => {
+        const logMessage = `Set Power.On to: ${on}`;
+        if (on && !this.isOff) {
+          this.log.info(`${logMessage}, projector not off`);
+          return;
+        }
+        if (!on && !this.isOn) {
+          this.log.info(`${logMessage}, projector not on`);
+          return;
+        }
+        this.log.info(logMessage);
+        await accessory.setPower(on);
+      });
+  }
+
+  get isWarming() {
+    return this.#power.isWarming;
+  }
+
+  get isOff() {
+    return this.#power.isOff;
+  }
+
+  get isOn() {
+    return this.#power.isOn;
   }
 
   get isWarmingOrOn() {
-    return [Jvc.Power.Warming, Jvc.Power.On].includes(this._state);
+    return this.isWarming || this.isOn;
   }
 
-  get state() {
-    return this._state;
-  }
-
-  set state(state) {
-    if (state !== this._state) {
-      this.log.info(`Power: ${state}`);
-      this._state = state;
+  updatePower(power) {
+    if (power && power !== this.#power) {
+      this.#power = power;
+      this.log.info(`Update PowerSwitch.On to: ${this.isWarmingOrOn}`);
       this.service
-        .getCharacteristic(hap.Characteristic.On)
+        .getCharacteristic(Characteristic.On)
         .updateValue(this.isWarmingOrOn);
     }
   }
 }
 
+class PositionState {
+  static INCREASING = new PositionState("INCREASING");
+  static DECREASING = new PositionState("DECREASING");
+  static STOPPED = new PositionState("STOPPED");
+  constructor(name) {
+    this.name = name;
+  }
+  get value() {
+    return Characteristic.PositionState[this.name];
+  }
+  toString() {
+    return `${this.name} (${this.value})`;
+  }
+}
+
 class LensPosition {
+  #position = 10;
+  #state = PositionState.STOPPED;
+
   constructor(accessory) {
     this.log = accessory.log;
-    this.service = new hap.Service.WindowCovering(`${this.name} Lens`);
+    this.service = new Service.WindowCovering(`${accessory.name} LensPosition`);
 
     this.service
-      .getCharacteristic(hap.Characteristic.PositionState)
-      .onGet(async () => this.state);
+      .getCharacteristic(Characteristic.PositionState)
+      .onGet(async () => {
+        this.log.info(`Get Lens.PositionState: ${this.#state}`);
+        return this.#state.value;
+      });
 
-    this._current = 10;
     this.service
-      .getCharacteristic(hap.Characteristic.CurrentPosition)
-      .onGet(async () => this._current);
+      .getCharacteristic(Characteristic.CurrentPosition)
+      .onGet(async () => {
+        this.log.info(`Get Lens.CurrentPosition: ${this.#position}`);
+        return this.#position;
+      });
 
-    this._target = 10;
     this.service
-      .getCharacteristic(hap.Characteristic.TargetPosition)
-      .onGet(async () => this._target)
-      .onSet(accessory.setLensPosition.bind(accessory))
+      .getCharacteristic(Characteristic.TargetPosition)
       .setProps({
         minValue: 10,
         maxValue: 100,
         minStep: 10,
+      })
+      .onGet(async () => {
+        this.log.info(`Get Lens.TargetPosition: ${this.#position}`);
+        return this.#position;
+      })
+      .onSet(async (position) => {
+        position = Math.max(Math.floor(position / 10), 1) * 10;
+        const logMessage = `Set Lens.TargetPosition to: ${position}`;
+        if (!accessory.isOn) {
+          this.log.info(`${logMessage}, projector not on`);
+          this.service
+            .getCharacteristic(Characteristic.TargetPosition)
+            .updateValue(this.#position);
+          return;
+        }
+        if (this.#state !== PositionState.STOPPED) {
+          this.log.info(`${logMessage}, lens in motion`);
+          return;
+        }
+        if (this.#position === position) {
+          this.log.info(`${logMessage}, lens already in position`);
+          return;
+        }
+        this.log.info(logMessage);
+        this.#updateState(position);
+        if (await accessory.setLensPosition(position)) {
+          this.updatePosition(position);
+        }
       });
   }
 
-  get isStopped() {
-    return this.state === hap.Characteristic.PositionState.STOPPED;
-  }
-
-  get state() {
-    if (this._target > this._current) {
-      return hap.Characteristic.PositionState.INCREASING;
+  #updateState(position) {
+    let state;
+    if (position > this.#position) {
+      state = PositionState.INCREASING;
+    } else if (position < this.#position) {
+      state = PositionState.DECREASING;
+    } else {
+      state = PositionState.STOPPED;
     }
-    if (this._target < this._current) {
-      return hap.Characteristic.PositionState.DECREASING;
-    }
-    return hap.Characteristic.PositionState.STOPPED;
-  }
-
-  set current(current) {
-    if (current && current !== this._current) {
-      this.log.info(`Lens current: ${current}`);
-      this._current = current;
+    if (state !== this.#state) {
+      this.#state = state;
+      this.log.info(`Update Lens.PositionState to: ${state}`);
       this.service
-        .getCharacteristic(hap.Characteristic.CurrentPosition)
-        .updateValue(this._current);
-      this.service
-        .getCharacteristic(hap.Characteristic.PositionState)
-        .updateValue(this.state);
+        .getCharacteristic(Characteristic.PositionState)
+        .updateValue(state.value);
     }
   }
 
-  equals = (position) => position === this._current;
-
-  get command() {
-    return Jvc.Operation.LensMemory[this._target / 10];
-  }
-
-  set target(target) {
-    target = Math.max(Math.floor(target / 10), 1) * 10;
-    if (target !== this._target) {
-      this.log.info(`Lens target: ${target}`);
-      this._target = target;
+  updatePosition(position) {
+    if (position >= 10 && position <= 100 && position !== this.#position) {
+      this.#position = position;
+      this.log.info(`Update Lens.CurrentPosition to: ${position}`);
       this.service
-        .getCharacteristic(hap.Characteristic.TargetPosition)
-        .updateValue(this._target);
+        .getCharacteristic(Characteristic.CurrentPosition)
+        .updateValue(position);
+      this.log.info(`Update Lens.TargetPosition to: ${position}`);
       this.service
-        .getCharacteristic(hap.Characteristic.PositionState)
-        .updateValue(this.state);
+        .getCharacteristic(Characteristic.TargetPosition)
+        .updateValue(position);
+      this.#updateState(position);
     }
   }
 }
 
 class JvcDlaAccessory {
+  #jvc;
+  #mutex;
+  #information;
+  #powerSwitch;
+  #lensPosition;
+
   constructor(log, config) {
     this.log = log;
-
     this.name = config.name;
-    this.jvc = new Jvc(config.host);
-    this.mutex = new Mutex();
-    this.information = new Information(this);
-    this.powerSwitch = new PowerSwitch(this);
-    this.lensPosition = new LensPosition(this);
-    this.poll(1);
+
+    this.#jvc = new Jvc(config.host);
+    this.#mutex = new Mutex();
+    this.#information = new Information(this);
+    this.#powerSwitch = new PowerSwitch(this);
+    this.#lensPosition = new LensPosition(this);
+    this.#poll(1);
   }
 
   getServices() {
-    return [this.information, this.powerSwitch, this.lensPosition].map(
+    return [this.#information, this.#powerSwitch, this.#lensPosition].map(
       (obj) => obj.service
     );
   }
 
-  async setPower(turnOn) {
-    this.log.info(`Set power: ${turnOn ? "on" : "off"}`);
+  get isOn() {
+    return this.#powerSwitch.isOn;
+  }
 
-    if (turnOn) {
-      if (this.powerSwitch.state !== Jvc.Power.Off) {
-        this.log.info("Can't power-on (projector not off)");
-        return;
-      }
-      await this.command(Jvc.Operation.Power.On);
-    } else {
-      if (this.powerSwitch.state !== Jvc.Power.On) {
-        this.log.info("Can't power-off (projector not on)");
-        return;
-      }
-      await this.command(Jvc.Operation.Power.Off);
-    }
+  async setPower(on) {
+    await this.#command(on ? Jvc.Operation.Power.On : Jvc.Operation.Power.Off);
   }
 
   async setLensPosition(position) {
-    this.log.info(`Set lens position: ${position}`);
-
-    if (this.powerSwitch.state !== Jvc.Power.On) {
-      this.log.info("Can't set lens (projector not on)");
-      return;
-    }
-
-    if (!this.lensPosition.isStopped) {
-      this.log.info("Can't set lens (lens not stopped)");
-      return;
-    }
-
-    if (this.lensPosition.equals(position)) {
-      this.log.info("Can't set lens (lens already in position)");
-      return;
-    }
-
-    this.lensPosition.target = position;
-    await this.command(this.lensPosition.command);
+    return await this.#command(Jvc.Operation.LensMemory[position / 10]);
   }
 
-  async command(command) {
-    await this.mutex.acquire();
+  async #command(command) {
+    const jvc = this.#jvc;
+    await this.#mutex.acquire();
     try {
-      this.log.debug(`Sending command ${command}`);
-      await this.jvc.connect();
-      // Use a longer timeout when sending operations since the projector doesn't
-      // return a response till the operation is completed. Moving the lens position
-      // can take a while to complete.
-      this.jvc.setTimeout(60 * 1000);
-      await this.jvc.send(command);
+      this.log.info(`Sending command ${command}`);
+      await jvc.connect();
+      // Prevent TimeoutError when performing operations since moving the lens
+      // takes a while to complete.
+      jvc.setTimeout(60 * 1000);
+      await jvc.send(command);
+      this.log.info(`Command ${command} complete`);
+      return true;
     } catch (e) {
-      this.log.info(`[ERROR] ${e}`);
+      this.log.info(`[ERROR] Command ${command}: ${e}`);
+      return false;
     } finally {
-      this.jvc.disconnect();
-      await this.mutex.release();
+      jvc.disconnect();
+      await this.#mutex.release();
     }
   }
 
-  poll(delay) {
-    const func = async () => {
-      const { jvc } = this;
-      await this.mutex.acquire();
+  static #POLL_DELAY_OFF = 60 * 1000;
+  static #POLL_DELAY_NOT_OFF = 5 * 1000;
+
+  #poll(delay) {
+    const poll = async () => {
+      const jvc = this.#jvc;
+      await this.#mutex.acquire();
       try {
-        this.log.debug("Polling projector status");
-        await this.jvc.connect();
-        this.powerSwitch.state = await jvc.getPower();
-        this.information.model = await jvc.getModel();
-        this.information.serialNumber = await jvc.getMacAddress();
-        if (this.powerSwitch.state === Jvc.Power.On) {
-          this.information.firmwareRevision = await jvc.getSoftwareVersion();
-          this.lensPosition.current = (await jvc.getLensMemory()) * 10;
+        this.log.info("Poll projector");
+        await jvc.connect();
+
+        this.#powerSwitch.updatePower(await jvc.getPower());
+        this.#information.updateModel(await jvc.getModel());
+        this.#information.updateSerialNumber(await jvc.getMacAddress());
+
+        if (this.#powerSwitch.isOn) {
+          this.#lensPosition.updatePosition((await jvc.getLensMemory()) * 10);
+          this.#information.updateFirmwareRevision(
+            await jvc.getSoftwareVersion()
+          );
         }
       } catch (e) {
         this.log.info(`[ERROR] ${e}`);
       } finally {
         jvc.disconnect();
-        await this.mutex.release();
+        await this.#mutex.release();
       }
-      this.poll(1000 * (this.powerSwitch.isOff ? 60 : 5));
+      this.#poll(
+        this.#powerSwitch.isOff
+          ? JvcDlaAccessory.#POLL_DELAY_OFF
+          : JvcDlaAccessory.#POLL_DELAY_NOT_OFF
+      );
     };
-    const timeoutObj = setTimeout(func, delay);
+    const timeoutObj = setTimeout(poll, delay);
     timeoutObj.unref();
   }
 }
