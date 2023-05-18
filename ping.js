@@ -38,7 +38,7 @@ async function ping() {
   const jvc = new Jvc(args.host, args.debug ? console.log : () => undefined);
   const power = await jvc.getPower();
   console.log(`Power ${power}`);
-  console.log(`Model ${await jvc.getModel()}`);
+  console.log(`Model ${await jvc.getModelCode()}`);
   console.log(`Mac ${await jvc.getMacAddress()}`);
   if (power.isOn) {
     console.log(`Lens ${await jvc.getLensMemory()}`);

@@ -296,7 +296,7 @@ class JvcDlaAccessory {
         await jvc.connect();
 
         this.#powerSwitch.updatePower(await jvc.getPower());
-        this.#information.updateModel(await jvc.getModel());
+        this.#information.updateModel(await jvc.getModelCode());
         this.#information.updateSerialNumber(await jvc.getMacAddress());
 
         if (this.power.isOn) {

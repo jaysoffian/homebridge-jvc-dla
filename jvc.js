@@ -251,9 +251,12 @@ class Jvc {
     await this.send(on ? Jvc.Operation.Power.On : Jvc.Operation.Power.Off);
   }
 
-  async getModel() {
+  async getModelCode() {
     const value = await this.send(Jvc.Reference.Model);
-    return /^ILAFPJ -- (.*)$/.exec(value)[1];
+    const match = /^ILAFPJ -- (.{4})$/.exec(value);
+    if (match) {
+      return match[1].replace(/^-/, "");
+    }
   }
 
   async getMacAddress() {
