@@ -96,7 +96,7 @@ class PositionState {
     return Characteristic.PositionState[this.name];
   }
   toString() {
-    return `${this.name} (${this.value})`;
+    return `${this.value} (${this.name})`;
   }
 }
 
