@@ -74,8 +74,8 @@ class Power {
 }
 
 class CommandError extends Error {
-  constructor(error) {
-    super(error);
+  constructor(...args) {
+    super(...args);
     this.name = "CommandError";
   }
 }
@@ -269,9 +269,8 @@ class Jvc {
       }
       return await this._send(command);
     } catch (e) {
-      console.error(e);
       this.disconnect();
-      return null;
+      throw new CommandError(e.message, { cause: e });
     }
   }
 
