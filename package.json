@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge JVC DLA Projector",
   "name": "homebridge-jvc-dla",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A Homebridge plugin to control JVC DLA projectors",
   "main": "index.js",
   "repository": {
