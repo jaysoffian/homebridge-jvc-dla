@@ -275,7 +275,8 @@ class JvcDlaAccessory {
       this.log.info(`ACK ${command}`);
       return true;
     } catch (e) {
-      this.log.info(`ERR ${command} ${e}`);
+      this.log.info(`ERR ${command}`);
+      this.log.info(e);
       return false;
     } finally {
       jvc.disconnect();
@@ -305,7 +306,7 @@ class JvcDlaAccessory {
           );
         }
       } catch (e) {
-        this.log.info(`[ERROR] ${e}`);
+        this.log.info(e);
       } finally {
         jvc.disconnect();
         await this.#mutex.release();
