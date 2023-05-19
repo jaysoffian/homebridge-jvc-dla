@@ -17,6 +17,10 @@
       "host": {
         "type": "string",
         "description": "Projector host name or IP address."
+      },
+      "password": {
+        "type": "string",
+        "description": "Projector password [8-16 characters] (2021 and newer models)."
       }
     }
   }

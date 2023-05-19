@@ -73,7 +73,13 @@ const hex = (buf, ...args) =>
     .filter((x) => !!x)
     .join(" ");
 
-const [PJ_OK, PJREQ, PJACK] = ["PJ_OK", "PJREQ", "PJACK"].map(bytes);
+const [PJ_OK, PJ_NG, PJREQ, PJACK, PJNAK] = [
+  "PJ_OK",
+  "PJ_NG",
+  "PJREQ",
+  "PJACK",
+  "PJNAK",
+].map(bytes);
 const [OPERATION, REFERENCE, RESPONSE, ACK] = ["!", "?", "@", "\x06"];
 const UNIT_ID = "\x89\x01";
 const END = "\n";
@@ -192,11 +198,25 @@ class Jvc {
   static TimeoutError = TimeoutError;
   static Power = Power;
 
-  constructor(host, debug) {
+  constructor({
+    host,
+    port = 20554,
+    password = undefined,
+    debug = () => undefined,
+  } = {}) {
+    assert(
+      password === undefined ||
+        password === "" ||
+        (typeof password === "string" &&
+          password.length >= 8 &&
+          password.length <= 16)
+    );
     assert(debug === undefined || typeof debug === "function");
     this.host = host;
+    this.port = port;
+    this.password = password;
+    this.debug = debug;
     this.sock = null;
-    this.debug = debug || (() => undefined);
   }
 
   async _connect() {
@@ -208,24 +228,36 @@ class Jvc {
 
     await sock.connect({
       host: this.host,
-      port: 20554,
+      port: this.port,
     });
 
-    // Check for PJ_OK
+    // Check for PJ_OK or PJ_NG
     let resp = await sock.read(PJ_OK.length);
+    if (PJ_NG.equals(resp)) {
+      this.debug("<<< PJ_NG");
+      throw new CommandError("Connection rejected with PJ_NG");
+    }
     if (!PJ_OK.equals(resp)) {
       throw new CommandError("Did not receive PJ_OK");
     }
     this.debug("<<< PJ_OK");
 
-    // Send PJREQ
-    this.debug(">>> PJREQ");
-    await sock.write(PJREQ);
+    // Send PJREQ with optional password (2021 models)
+    const pjreq = this.password
+      ? bytes(`${latin1(PJREQ)}_${this.password.padEnd(16, "\x00")}`)
+      : PJREQ;
 
-    // Check for PJACK
+    this.debug(`>>> PJREQ ${hex(pjreq)}`);
+    await sock.write(pjreq);
+
+    // Check for PJACK or PJNAK
     resp = await sock.read(PJACK.length);
     if (!PJACK.equals(resp)) {
-      throw new CommandError("Did not receive PJACK");
+      throw new CommandError(
+        PJNAK.equals(resp)
+          ? "Projector sent PJNAK (check password, if any)"
+          : "Did not receive PJACK"
+      );
     }
     this.debug("<<< PJACK");
 
