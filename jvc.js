@@ -17,12 +17,46 @@
 // - XHF: DLA-X70R, DLA-X90R, DLA-RS55, DLA-RS65
 // https://support.jvc.com/consumer/support/documents/DILAremoteControlGuide.pdf
 //
+// D-ILA® Projector Cedia Command Communication Specification (2013)
+// - DLA-RS46
+// - DLA-RS4810
+// - DLA-RS48
+// - DLA-RS56
+// - DLA-RS66
+// http://pro.jvc.com/pro/attributes/PRESENT/manual/2013_model_JVC_Prof_Version_v1.2%20English.pdf
+//
+// D-ILA® Projector RS232 Command Communication Specification (2014)
+// - DLA-RS49
+// - DLA-RS4910
+// - DLARS57
+// - DLA-RS67/RS6710
+// http://pro.jvc.com/pro/attributes/PRESENT/manual/RS_Model_2014_RS232_Command_Spec.pdf
+//
+// D-ILA® Projector JVC External Control Command Communication Specification (2015)
+// - DLA-X550R/X5000/XC5890R/RS400 Series
+// - DLA-XC6890 Series
+// - DLA-X750R/X7000/XC7890R/RS500 Series
+// - DLA-X950R/X9000/RS600/PX1 Series
+// https://support.jvc.com/consumer/support/documents/2015model_JVC_External_Control_Command_spec_v1_0.pdf
+//
+// D-ILA® Projector External Communication Specification (2017)
+// - DLA-X570R, RS420 Series
+// - DLA-X770R, RS520
+// - DLA-X970, RS620 Series
+// http://pro.jvc.com/pro/attributes/PRESENT/manual/MK8_Ext_spec_v1_0%20English_Final.pdf
+//
 // D-ILA Projector External Command Communication Specification (2018)
 // - B2A1: DLA-RS3000, NX9, NX11, V9R Series
 // - B2A2: DLA-RS2000, NX7, N8, V7 Series
 // - B2A3: DLA-RS1000, NX5, N5, N6, V5 Series
 // https://www.us.jvc.com/projectors/pdf/2018_ILA-FPJ_Ext_Command_List_v1.2.pdf
 //
+// D-ILA Projector 2021 Model LAN connection specification
+// - NP5 / RS1100
+// - NZ7 / RS2100
+// - NZ8 / RS3100
+// - NZ9 / RS4100
+// https://www.snapav.com/wcsstore/ExtendedSitesCatalogAssetStore/attachments/documents/ProjectionScreens/SupportDocuments/ILAFPJ2021_LANconnection_spec_EN.pdf
 
 "use strict";
 const assert = require("node:assert");
