@@ -20,7 +20,12 @@
       },
       "password": {
         "type": "string",
-        "description": "Projector password [8-16 characters] (2021 and newer models)."
+        "description": "Projector password (2021 and 2024 model years)."
+      },
+      "is_2024_model": {
+        "title": "Is 2024 Model Year?",
+        "type": "boolean",
+        "description": "Projector is a 2024 model (NZx00, RSx200, etc)."
       }
     }
   }

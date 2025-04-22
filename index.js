@@ -207,7 +207,11 @@ class JvcDlaAccessory {
     this.log = log;
     this.name = config.name;
 
-    this.#jvc = new Jvc({ host: config.host, password: config.password });
+    this.#jvc = new Jvc({
+      host: config.host,
+      password: config.password,
+      is_2024_model: config.is_2024_model,
+    });
     this.#mutex = new Mutex();
     this.#information = new Information(this);
     this.#powerSwitch = new PowerSwitch(this);

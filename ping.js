@@ -7,6 +7,7 @@ const { parseArgs: _parseArgs } = require("node:util");
 function usage() {
   console.log("usage: ping.js [options...] <host>");
   console.log(" -p, --password   Specify password (default: no password)");
+  console.log("     --2024       Specify projector is 2024 model year");
   console.log(" -P, --port       Specify port (default: 20554)");
   console.log(" -d, --debug      Enable debug output");
   console.log(" --help           Show this message and quit");
@@ -15,13 +16,15 @@ function usage() {
 
 function parseArgs() {
   const options = {
-    port: {
-      type: "string",
-      short: "P",
-    },
     password: {
       type: "string",
       short: "p",
+    },
+    "2024": {
+      type: "boolean",
+    },
+    port: {
+      type: "string",
     },
     debug: {
       type: "boolean",
@@ -45,6 +48,7 @@ function parseArgs() {
     host: args.positionals[0],
     port: args.values.port,
     password: args.values.password,
+    is_2024_model: args.values["2024"],
     debug: args.values.debug ? console.log : undefined,
   };
 }

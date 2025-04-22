@@ -57,14 +57,23 @@
 // - NZ8 / RS3100
 // - NZ9 / RS4100
 // https://www.snapav.com/wcsstore/ExtendedSitesCatalogAssetStore/attachments/documents/ProjectionScreens/SupportDocuments/ILAFPJ2021_LANconnection_spec_EN.pdf
+//
+// D-ILA Projector 2024 Model LAN connection specification
+// - NZ500 / RS1200
+// - NZ700 / RS2200
+// - NZ800 / RS3200
+// - NZ900 / RS4200
+// https://www.jvc.com/usa/projectors/installers-calibrators/lan-connection-specification/
 
 "use strict";
 const assert = require("node:assert");
+const { createHash } = require('node:crypto');
 const { PromiseSocket, TimeoutError } = require("promise-socket");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const bytes = (s) => Buffer.from(s, "latin1");
 const latin1 = (buf, ...args) => buf.slice(...args).toString("latin1");
+const sha256hex = (s) => createHash("sha256").update(s).digest("hex");
 const hex = (buf, ...args) =>
   buf
     .slice(...args)
@@ -73,12 +82,13 @@ const hex = (buf, ...args) =>
     .filter((x) => !!x)
     .join(" ");
 
-const [PJ_OK, PJ_NG, PJREQ, PJACK, PJNAK] = [
+const [PJ_OK, PJ_NG, PJREQ, PJACK, PJNAK, JVCKWPJ] = [
   "PJ_OK",
   "PJ_NG",
   "PJREQ",
   "PJACK",
   "PJNAK",
+  "JVCKWPJ",
 ].map(bytes);
 const [OPERATION, REFERENCE, RESPONSE, ACK] = ["!", "?", "@", "\x06"];
 const UNIT_ID = "\x89\x01";
@@ -202,15 +212,22 @@ class Jvc {
     host,
     port = 20554,
     password = undefined,
+    is_2024_model = false,
     debug = () => undefined,
   } = {}) {
-    assert(
-      password === undefined ||
-        password === "" ||
-        (typeof password === "string" &&
-          password.length >= 8 &&
-          password.length <= 16)
-    );
+    assert(password === undefined || typeof password === "string");
+    if (password) {
+      assert(password.length >= 8);
+      if (is_2024_model) {
+        // 2024 models: append JVCKWPJ and convert to sha256 hexdigest
+        assert(password.length <= 10);
+        password = sha256hex(`${password}${JVCKWPJ}`);
+      } else {
+        // 2021 models: pad out to 16 with null bytes
+        assert(password.length <= 16);
+        password = password.padEnd(16, "\x00");
+      }
+    }
     assert(debug === undefined || typeof debug === "function");
     this.host = host;
     this.port = port;
@@ -242,9 +259,9 @@ class Jvc {
     }
     this.debug("<<< PJ_OK");
 
-    // Send PJREQ with optional password (2021 models)
+    // Send PJREQ with optional password
     const pjreq = this.password
-      ? bytes(`${latin1(PJREQ)}_${this.password.padEnd(16, "\x00")}`)
+      ? bytes(`${latin1(PJREQ)}_${this.password}`)
       : PJREQ;
 
     this.debug(`>>> PJREQ ${hex(pjreq)}`);
