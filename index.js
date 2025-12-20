@@ -197,6 +197,7 @@ class JvcDlaAccessory {
   static #POLL_DELAY_OFF = 60 * 1000;
   static #POLL_DELAY_NOT_OFF = 5 * 1000;
 
+  #config;
   #jvc;
   #mutex;
   #information;
@@ -207,6 +208,7 @@ class JvcDlaAccessory {
     this.log = log;
     this.name = config.name;
 
+    this.#config = config;
     this.#jvc = new Jvc({
       host: config.host,
       password: config.password,
@@ -270,7 +272,9 @@ class JvcDlaAccessory {
         this.#information.updateSerialNumber(await jvc.getMacAddress());
 
         if (this.power.isOn) {
-          this.#lensPosition.updatePosition((await jvc.getLensMemory()) * 10);
+          if (!this.#config.is_2024_model) {
+            this.#lensPosition.updatePosition((await jvc.getLensMemory()) * 10);
+          }
           this.#information.updateFirmwareRevision(
             await jvc.getSoftwareVersion()
           );
